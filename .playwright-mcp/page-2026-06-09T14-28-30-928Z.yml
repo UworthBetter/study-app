@@ -1,0 +1,33 @@
+- generic [ref=e5]:
+  - generic [ref=e6]:
+    - img [ref=e8]
+    - generic [ref=e12]:
+      - heading "学习题库" [level=1] [ref=e13]
+      - paragraph [ref=e14]: 12 个题库 · 606 道题目
+  - generic [ref=e15]:
+    - heading "学科分类" [level=2] [ref=e16]
+    - button "操作系统 9 个题库 · 366 道题 单选 366" [ref=e17]:
+      - generic [ref=e18]:
+        - img [ref=e20]
+        - generic [ref=e22]:
+          - heading "操作系统" [level=3] [ref=e23]
+          - paragraph [ref=e24]: 9 个题库 · 366 道题
+          - generic [ref=e26]: 单选 366
+        - img [ref=e27]
+    - button "数据结构 3 个题库 · 240 道题 单选 122 判断 118" [ref=e29]:
+      - generic [ref=e30]:
+        - img [ref=e32]
+        - generic [ref=e36]:
+          - heading "数据结构" [level=3] [ref=e37]
+          - paragraph [ref=e38]: 3 个题库 · 240 道题
+          - generic [ref=e39]:
+            - generic [ref=e40]: 单选 122
+            - generic [ref=e41]: 判断 118
+        - img [ref=e42]
+    - generic [ref=e44]:
+      - button "导入新题库" [ref=e45]:
+        - img [ref=e46]
+        - text: 导入新题库
+      - button "清除自定义数据" [ref=e48]:
+        - img [ref=e49]
+        - text: 清除自定义数据

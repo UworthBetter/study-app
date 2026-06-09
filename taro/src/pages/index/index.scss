@@ -1,0 +1,82 @@
+.container {
+  padding: 30px;
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
+.privacy-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .privacy-mask {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .privacy-dialog {
+    position: relative;
+    width: 600px;
+    background: #fff;
+    border-radius: 24px;
+    padding: 40px;
+    z-index: 1;
+
+    .privacy-title {
+      font-size: 36px;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 30px;
+      color: #333;
+    }
+
+    .privacy-content {
+      font-size: 28px;
+      color: #666;
+      line-height: 1.8;
+      margin-bottom: 40px;
+
+      .privacy-link {
+        display: inline;
+        color: #4a90d9;
+        text-decoration: underline;
+      }
+    }
+
+    .privacy-buttons {
+      display: flex;
+      gap: 20px;
+
+      .privacy-btn {
+        flex: 1;
+        height: 80px;
+        line-height: 80px;
+        text-align: center;
+        border-radius: 40px;
+        font-size: 30px;
+        font-weight: 500;
+
+        &.reject {
+          background: #f5f5f5;
+          color: #666;
+        }
+
+        &.agree {
+          background: #4a90d9;
+          color: #fff;
+        }
+      }
+    }
+  }
+}

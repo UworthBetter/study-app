@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  BookOpen, 
-  CheckCircle, 
-  RotateCcw, 
-  FileText, 
-  Plus, 
-  Award, 
+import {
+  CheckCircle,
+  RotateCcw,
+  FileText,
+  Plus,
+  Award,
   AlertCircle,
   ChevronRight,
   ChevronLeft,
@@ -15,32 +14,44 @@ import {
   LayoutGrid,
   X,
   RefreshCw,
-  CheckSquare, 
-  Square,      
-  Circle,      
+  CheckSquare,
+  Square,
+  Circle,
   Check,
-  Send 
+  Send,
+  Upload,
+  Loader2,
+  Monitor,
+  GitBranch,
+  Layers,
+  ArrowLeft,
+  BookMarked,
+  FolderOpen,
 } from 'lucide-react';
+import { SUBJECTS } from './data/questionBank';
+import type { Subject } from './data/questionBank';
 
 // --- 类型定义 ---
-type QuestionType = 'single' | 'multiple' | 'boolean';
+export type QuestionType = 'single' | 'multiple' | 'boolean';
 
-interface Question {
+export interface Question {
   id: number;
-  type: QuestionType; 
+  type: QuestionType;
   question: string;
   options: string[];
-  correctAnswer: number | number[]; 
+  correctAnswer: number | number[];
   userAnswer?: number | number[] | null;
   explanation?: string;
 }
 
-interface Chapter {
+export interface Chapter {
   id: string;
   title: string;
   questions: Question[];
   createDate: number;
 }
+
+type ViewMode = 'home' | 'subject' | 'study' | 'exam' | 'browse' | 'result' | 'import';
 
 // --- 工具函数 ---
 
@@ -75,114 +86,369 @@ const formatAnswerLabel = (answer: number | number[] | null): string => {
   return String.fromCharCode(65 + answer);
 };
 
-// --- 预置数据 ---
+// === 基于行分析的解析器 ===
 
-const FILE_MANAGEMENT_QUESTIONS: Question[] = [
-  {
-    id: 1,
-    type: 'single',
-    question: "设置当前工作目录的主要目的是（   ）。",
-    options: ["节省外存空间", "节省内存空间", "加快文件的检索速度", "加快文件的读写速度"],
-    correctAnswer: 2,
-    explanation: "设置当前工作目录可以大大减少路径名的字符数，从而加快文件的检索速度。"
-  },
-];
+const normalizeText = (text: string): string => {
+  let result = text
+    .replace(/[！-～]/g, char => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
+    .replace(/[　 ]/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[‐-―]/g, '-')
+    .replace(/[．。]/g, '.')
+    .replace(/[，、]/g, '、')
+    .replace(/[（）]/g, match => (match === '（' ? '(' : ')'))
+    .replace(/[【［〔]/g, '[')
+    .replace(/[】］〕]/g, ']')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
-const GAILUN_QUESTIONS: Question[] = [
-  // --- 单选题 ---
-  { id: 1, type: 'single', question: "1. (单选题)科学发展观的第一要义是( )。", options: ["科教兴国", "要用新的发展思路实现更快更好地发展", "发展", "发展战略"], correctAnswer: 2, explanation: "" },
-  { id: 2, type: 'single', question: "2. (单选题)科学发展观的基本要求是( )。", options: ["促进人的全面发展", "坚持以人为本", "全面协调可持续", "大力发展循环经济"], correctAnswer: 2, explanation: "" },
-  { id: 3, type: 'single', question: "3. (单选题)必须坚持正确处理( )的关系,把改革的力度、发展的速度和社会可承受的程度统一起来...", options: ["改革开放发展", "改革发展稳定", "内政国防外交", "经济政治文化"], correctAnswer: 1, explanation: "" },
-  { id: 4, type: 'single', question: "4. (单选题)和谐社会的特征不包括( )。", options: ["绝对稳定", "公平正义", "充满活力", "民主法治"], correctAnswer: 0, explanation: "" },
-  { id: 5, type: 'single', question: "5. (单选题)科学发展观提出的背景之一是2003年的( )。", options: ["禽流感疫情", "口蹄疫疫情", "疯牛病疫情", "非典疫情"], correctAnswer: 3, explanation: "" },
-  { id: 6, type: 'single', question: "6. (单选题)科学发展观回答了新形势下( )的重大问题...", options: ["建设什么样的党,怎样建设党", "实现什么样的发展,怎样发展", "什么是社会主义,怎样建设社会主义", "什么是中国特色社会主义,怎样建设中国特色社会主义"], correctAnswer: 1, explanation: "" },
-  { id: 7, type: 'single', question: "7. (单选题)建设( )、环境友好型社会...", options: ["循环利用型", "资源节约型", "生态优美型", "污染零排放"], correctAnswer: 1, explanation: "" },
-  { id: 8, type: 'single', question: "8. (单选题)( )是党和国家到二〇二〇年的奋斗目标...", options: ["全面建成小康社会", "基本建成小康社会", "基本实现现代化", "走出社会主义初级阶段"], correctAnswer: 0, explanation: "" },
-  { id: 9, type: 'single', question: "9. (单选题)构建社会主义和谐社会要求着力解决( )。", options: ["GDP速度问题", "政治不民主问题", "人民最关心、最直接、最现实的利益问题", "生态破坏问题"], correctAnswer: 2, explanation: "" },
-  { id: 10, type: 'single', question: "10. (单选题)要坚持把( )作为正确处理改革发展稳定关系的结合点...", options: ["改善人民生活", "解决社会矛盾", "促进对外开放", "增进政治民主"], correctAnswer: 0, explanation: "" },
-  { id: 11, type: 'single', question: "11. (单选题)2006年,中共( )通过了《关于构建社会主义和谐社会若干重大问题的决定》。", options: ["十六大", "十六届六中全会", "十七大", "十七届三中全会"], correctAnswer: 1, explanation: "" },
-  { id: 12, type: 'single', question: "12. (单选题)“五个统筹”不包括( )。", options: ["统筹经济社会发展", "统筹阶层矛盾解决", "统筹区域发展", "统筹国内发展和对外开放"], correctAnswer: 1, explanation: "" },
-  { id: 13, type: 'single', question: "13. (单选题)必须坚持在( )下,全社会共同建设社会主义和谐社会。", options: ["改革开放", "深化改革", "经济发展", "党的领导"], correctAnswer: 3, explanation: "" },
-  { id: 14, type: 'single', question: "14. (单选题)科学发展过程中,要更加注重解决( )问题...", options: ["发展不平衡", "发展速度慢", "发展效率", "发展环境"], correctAnswer: 0, explanation: "" },
-  { id: 15, type: 'single', question: "15. (单选题)构建和谐社会应逐步实现( )。", options: ["公共服务均等化", "基本公共服务均等化", "税收应收皆收", "财政支出缩小化"], correctAnswer: 1, explanation: "" },
-  { id: 16, type: 'single', question: "16. (单选题)改革开放以来,我国发展所积累的丰富经验包括把坚持社会主义基本制度同( )结合起来。", options: ["发展计划经济", "发展市场经济", "市场为主", "计划为主"], correctAnswer: 1, explanation: "" },
-  { id: 17, type: 'single', question: "17. (单选题)胡锦涛指出,( )是解决中国一切问题的总钥匙。", options: ["发展", "改革", "开放", "稳定"], correctAnswer: 0, explanation: "" },
-  { id: 18, type: 'single', question: "18. (单选题)坚持科学发展,要把( )作为根本出发点和落脚点。", options: ["保障和改善民生", "保护生态环境", "提升经济发展速度", "政治进步"], correctAnswer: 0, explanation: "" },
-  { id: 19, type: 'single', question: "19. (单选题)科学发展观中的“全面”发展指的是包括经济建设等在内的( )的发展。", options: ["五位一体", "四位一体", "三位一体", "六位一体"], correctAnswer: 0, explanation: "" },
-  
-  // --- 多选题 ---
-  { id: 20, type: 'multiple', question: "20. (多选题)我们要更好实施( ),着力把握发展规律...", options: ["科教兴国战略", "人才强国战略", "可持续发展战略", "计划生育战略"], correctAnswer: [0, 1, 2], explanation: "" },
-  { id: 21, type: 'multiple', question: "21. (多选题)深入贯彻落实科学发展观,要求我们( )。", options: ["始终坚持“一个中心、两个基本点”的基本路线", "积极构建社会主义和谐社会", "继续深化改革开放", "切实加强和改进党的建设"], correctAnswer: [0, 1, 2, 3], explanation: "" },
-  { id: 22, type: 'multiple', question: "22. (多选题)我国已进入改革发展的关键时期,( )...", options: ["经济体制深刻变革", "社会结构深刻变动", "利益格局深刻调整", "思想观念深刻变化"], correctAnswer: [0, 1, 2, 3], explanation: "" },
-  { id: 23, type: 'multiple', question: "23. (多选题)在经济发展的基础上,我们要更加注重社会公平,( ),促进共同富裕。", options: ["着力提高低收入者收入水平", "逐步扩大中等收入者比重", "有效调节过高收入", "坚决取缔非法收入"], correctAnswer: [0, 1, 2, 3], explanation: "" },
-  { id: 24, type: 'multiple', question: "24. (多选题)中国特色社会主义理论体系,就是包括( )在内的科学理论体系。", options: ["邓小平理论", "“三个代表”重要思想", "科学发展观", "习近平新时代中国特色社会主义思想"], correctAnswer: [0, 1, 2, 3], explanation: "" },
-  { id: 25, type: 'multiple', question: "25. (多选题)加快转变经济发展方式,推动产业结构优化升级...", options: ["科技进步", "劳动者素质提高", "管理创新", "服务业发展"], correctAnswer: [0, 1, 2], explanation: "" },
-  { id: 26, type: 'multiple', question: "26. (多选题)实施可持续发展战略,就要实现经济发展同人口、资源、环境相协调,坚持走( )的文明发展道路。", options: ["高度自主", "生产发展", "生活富裕", "生态良好"], correctAnswer: [1, 2, 3], explanation: "" },
-  { id: 27, type: 'multiple', question: "27. (多选题)新形势下,党面临的考验包括( )。", options: ["执政考验", "改革开放考验", "市场经济考验", "外部环境考验"], correctAnswer: [0, 1, 2, 3], explanation: "" },
-  { id: 28, type: 'multiple', question: "28. (多选题)新形势下,党面临的危险包括( )。", options: ["精神懈怠的危险", "能力不足的危险", "脱离群众的危险", "消极腐败的危险"], correctAnswer: [0, 1, 2, 3], explanation: "" },
-  { id: 29, type: 'multiple', question: "29. (多选题)科学发展观是( )。", options: ["对经济社会发展一般规律认识的深化", "马克思主义关于发展的世界观和方法论的集中体现", "中国特色社会主义理论体系的重要组成部分", "马克思主义中国化的最新理论成果"], correctAnswer: [0, 1, 2], explanation: "" },
+  // 合并被PDF截断的行
+  const lines = result.split('\n');
+  const merged: string[] = [];
+  const punctuation = /[.。！？；：，、)）\]】]$/;
+  const newBlockPattern = /^(?:(?:第\s*)?\d{1,4}\s*[.、):：]|[A-Ha-h]\s*[.、):：]|(?:我的|正确|参考|标准)?\s*答案|AI\s*讲解)/;
 
-  // --- 判断题 ---
-  { id: 30, type: 'boolean', question: "30. (判断题)当前中国协调发展取得显著成绩...缩小城乡、区域发展差距和促进经济社会协调发展任务不再艰巨。", options: ["对", "错"], correctAnswer: 1, explanation: "任务依然艰巨。" },
-  { id: 31, type: 'boolean', question: "31. (判断题)科学发展观的可持续发展,就是既要考虑当前发展的需要...为子孙后代着想。", options: ["对", "错"], correctAnswer: 0, explanation: "" },
-  { id: 32, type: 'boolean', question: "32. (判断题)统筹兼顾是科学发展观的核心。", options: ["对", "错"], correctAnswer: 1, explanation: "核心是以人为本，根本方法是统筹兼顾。" },
-  { id: 33, type: 'boolean', question: "33. (判断题)科学发展观回答的是在全面建设小康社会和实现现代化的进程中...", options: ["对", "错"], correctAnswer: 1, explanation: "回答了“实现什么样的发展、怎样发展”等重大问题。" },
-  { id: 34, type: 'boolean', question: "34. (判断题)目前,我国社会总体上是和谐的。不存在影响社会和谐的矛盾和问题。", options: ["对", "错"], correctAnswer: 1, explanation: "矛盾和问题依然存在。" },
-  { id: 35, type: 'boolean', question: "35. (判断题)社会和谐在很大程度上取决于社会生产力的发展水平,取决于发展的协调性。", options: ["对", "错"], correctAnswer: 0, explanation: "" },
-  { id: 36, type: 'boolean', question: "36. (判断题)必须坚持用发展的办法解决前进中的问题...", options: ["对", "错"], correctAnswer: 0, explanation: "" },
-  { id: 37, type: 'boolean', question: "37. (判断题)社会主义协商民主充分体现了社会主义民主的真实性广泛性、包容性。", options: ["对", "错"], correctAnswer: 0, explanation: "" },
-  { id: 38, type: 'boolean', question: "38. (判断题)社会主义愈发展,民主就愈发展。", options: ["对", "错"], correctAnswer: 0, explanation: "" },
-  { id: 39, type: 'boolean', question: "39. (判断题)转变经济增长方式包含着转变经济发展方式的内容。", options: ["对", "错"], correctAnswer: 1, explanation: "转变经济发展方式包含着转变经济增长方式，后者是前者的基础和重要组成部分，范围不同。" },
-  { id: 40, type: 'boolean', question: "40. (判断题)全面深化经济体制改革是加快转变经济发展方式的关键。", options: ["对", "错"], correctAnswer: 0, explanation: "" },
-];
+  for (let i = 0; i < lines.length; i++) {
+    const current = lines[i].trim();
+    const next = lines[i + 1]?.trim();
 
-const DEFAULT_CHAPTERS: Chapter[] = [
-  {
-    id: 'gailun-ex8',
-    title: '概论练习8 (含多选)',
-    questions: GAILUN_QUESTIONS,
-    createDate: Date.now()
-  },
-  {
-    id: 'file-mgmt-hw',
-    title: '第8、9章（文件管理）大作业',
-    questions: FILE_MANAGEMENT_QUESTIONS,
-    createDate: Date.now()
+    if (!current) continue;
+
+    // 如果当前行包含"答案解析"，强制合并下一行（解析内容可能跨行）
+    const isExplanation = /答案\s*解析/.test(current);
+    const shouldMerge = current && next && (
+      (isExplanation && !newBlockPattern.test(next)) ||
+      (!punctuation.test(current) && !newBlockPattern.test(next))
+    );
+
+    if (shouldMerge) {
+      merged.push(current + next);
+      i++; // 跳过下一行
+    } else {
+      merged.push(current);
+    }
   }
-];
+
+  return merged.join('\n');
+};
+
+const compactLine = (text: string): string => {
+  return text.replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
+};
+
+const isNoiseLine = (line: string): boolean => {
+  const t = line.trim();
+  if (!t) return true;
+  if (/^\d+\s*\/\s*\d+$/.test(t)) return true;
+  if (/^(\d{1,2}\s+){3,}\d{1,2}$/.test(t)) return true;
+  if (/^\d+(\.\d+)?\s*分$/.test(t)) return true;
+  if (/^AI\s*讲解$/.test(t)) return true;
+  if (/^(题量|满分|作答时间|智能分析|作业详情)/.test(t)) return true;
+  if (/^一\s*\.\s*(?:单选|多选|判断)题/.test(t)) return true;
+  if (/[-]/.test(t)) return true;
+  if (/^[()（）]+$/.test(t)) return true;
+  return false;
+};
+
+const detectQuestionType = (label: string, options: string[], answer: string): QuestionType => {
+  if (/多选|多项|不定项/.test(label)) return 'multiple';
+  if (/判断|对错|正误/.test(label)) return 'boolean';
+  if (answer && /^[A-H]{2,}$/i.test(answer.trim())) return 'multiple';
+  if (options.length === 2 &&
+      options.some(opt => /^(对|正确|√|T|A)$/i.test(opt.trim())) &&
+      options.some(opt => /^(错|错误|×|F|B)$/i.test(opt.trim()))) return 'boolean';
+  return 'single';
+};
+
+const parseAnswerIndex = (answer: string, type: QuestionType): number | number[] => {
+  const normalized = answer.trim().toUpperCase();
+  if (type === 'boolean') {
+    return /^(对|正确|√|T|A)$/i.test(answer.trim()) ? 0 : 1;
+  }
+  const indices = normalized.replace(/[^A-H]/g, '').split('').map(c => c.charCodeAt(0) - 65);
+  return type === 'multiple' ? [...new Set(indices)].sort() : (indices[0] ?? 0);
+};
+
+type LineType = 'question' | 'option' | 'my_answer' | 'correct_answer' | 'explanation' | 'answer_line' | 'text_with_explanation' | 'noise' | 'text';
+
+const classifyLine = (line: string): { type: LineType; value?: string } => {
+  const t = line.trim();
+  if (!t) return { type: 'noise' };
+
+  const qMatch = t.match(/^(?:第\s*)?(\d{1,4})\s*[.、):：]\s*(.*)/);
+  if (qMatch) return { type: 'question', value: qMatch[2] };
+
+  const oMatch = t.match(/^([A-Ha-h])\s*[.、):：]\s*(.*)/);
+  if (oMatch) return { type: 'option', value: oMatch[1].toUpperCase() + '. ' + oMatch[2] };
+
+  // 一行中同时包含我的答案、正确答案和可能的解析
+  if (/我的\s*答案/.test(t)) {
+    const myMatch = t.match(/我的\s*答案\s*[:：]?\s*([A-Ha-h]+|对|错|正确|错误|√|×)/i);
+    const correctMatch = t.match(/正确答案\s*[:：]?\s*([A-Ha-h]+|对|错|正确|错误|√|×)/i);
+    const explanationMatch = t.match(/答案解析\s*[:：]?\s*(.*)/);
+
+    // 如果有解析内容，需要在主循环中特殊处理
+    // 返回一个复合信息
+    if (myMatch || correctMatch) {
+      return {
+        type: 'answer_line',
+        value: JSON.stringify({
+          my: myMatch?.[1] || '',
+          correct: correctMatch?.[1] || '',
+          explanation: explanationMatch?.[1] || '',
+        })
+      };
+    }
+  }
+
+  // 解析行（优先于答案行检测，因为"答案解析"包含"答案"）
+  if (/^答案\s*解析/.test(t)) {
+    return { type: 'explanation', value: t.replace(/^答案\s*解析\s*[:：]?\s*/, '') };
+  }
+
+  // 正确答案行
+  if (/^(?:正确|参考|标准)?\s*答案/.test(t)) {
+    const m = t.match(/(?:正确|参考|标准)?\s*答案\s*[:：]?\s*([A-Ha-h]+|对|错|正确|错误|√|×)/i);
+    if (m) return { type: 'correct_answer', value: m[1] };
+  }
+
+  // 文本行中包含解析内容（如题目和解析在同一行）
+  if (/答案\s*解析/.test(t)) {
+    const parts = t.split(/答案\s*解析\s*[:：]?\s*/);
+    if (parts.length >= 2) {
+      return { type: 'text_with_explanation', value: JSON.stringify({ text: parts[0].trim(), explanation: parts.slice(1).join('答案解析').trim() }) };
+    }
+  }
+
+  return { type: 'text', value: t };
+};
+
+const parseQuestionsFromText = (rawText: string): Question[] => {
+  const text = normalizeText(rawText);
+  const lines = text.split('\n').filter(line => !isNoiseLine(line));
+
+  const questions: Question[] = [];
+  let cur: {
+    number: number;
+    label: string;
+    textParts: string[];
+    options: string[];
+    myAnswer: string;
+    correctAnswer: string;
+    explanation: string;
+  } | null = null;
+
+  const flush = () => {
+    if (!cur) return;
+    const questionText = cur.textParts.join(' ').trim();
+    const answer = cur.correctAnswer || cur.myAnswer;
+    const type = detectQuestionType(cur.label, cur.options, answer);
+
+    if (type === 'boolean' && cur.options.length === 0) cur.options = ['对', '错'];
+    if (!questionText) { cur = null; return; }
+    if (type !== 'boolean' && cur.options.length < 2 && !answer) { cur = null; return; }
+
+    questions.push({
+      id: 0,
+      type,
+      question: questionText,
+      options: cur.options,
+      correctAnswer: answer ? parseAnswerIndex(answer, type) : (type === 'multiple' ? [] : 0),
+      explanation: cur.explanation,
+    });
+    cur = null;
+  };
+
+  for (const line of lines) {
+    const cls = classifyLine(line);
+
+    if (cls.type === 'question') {
+      flush();
+      const num = parseInt(line.match(/^(?:第\s*)?(\d{1,4})/)?.[1] || '0');
+      cur = {
+        number: num,
+        label: cls.value || '',
+        textParts: [],
+        options: [],
+        myAnswer: '',
+        correctAnswer: '',
+        explanation: '',
+      };
+      if (cls.value) {
+        const cleanText = cls.value.replace(/^\(?\s*(?:单选|多选|判断|多项|不定项)\s*题?\s*\)?\s*/i, '').trim();
+        if (cleanText) cur.textParts.push(cleanText);
+      }
+      continue;
+    }
+
+    if (!cur) continue;
+
+    if (cls.type === 'option') {
+      cur.options.push(cls.value!.replace(/^[A-Ha-h]\s*[.、):：]\s*/, ''));
+    } else if (cls.type === 'answer_line') {
+      // 复合答案行：包含我的答案、正确答案和可能的解析
+      try {
+        const data = JSON.parse(cls.value!);
+        if (data.my) cur.myAnswer = data.my;
+        if (data.correct) cur.correctAnswer = data.correct;
+        if (data.explanation) cur.explanation += (cur.explanation ? ' ' : '') + data.explanation;
+      } catch {}
+    } else if (cls.type === 'correct_answer') {
+      cur.correctAnswer = cls.value!;
+    } else if (cls.type === 'my_answer') {
+      cur.myAnswer = cls.value!;
+    } else if (cls.type === 'explanation') {
+      cur.explanation += (cur.explanation ? ' ' : '') + cls.value!;
+    } else if (cls.type === 'text_with_explanation') {
+      // 文本行中包含解析内容
+      try {
+        const data = JSON.parse(cls.value!);
+        if (data.text) cur.textParts.push(data.text);
+        if (data.explanation) cur.explanation += (cur.explanation ? ' ' : '') + data.explanation;
+      } catch {}
+    } else if (cls.type === 'text') {
+      cur.textParts.push(cls.value!);
+    }
+  }
+
+  flush();
+  return questions.map((q, i) => ({ ...q, id: i + 1 }));
+};
+
+const getErrorMessage = (error: unknown): string => {
+  return error instanceof Error ? error.message : String(error);
+};
+
+
+const extractPdfText = async (arrayBuffer: ArrayBuffer): Promise<string> => {
+  const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+  const formData = new FormData();
+  formData.append('file', blob, 'document.pdf');
+
+  const response = await fetch('http://127.0.0.1:5000/api/parse-pdf', {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `PDF 解析服务响应错误: ${response.status}`);
+  }
+
+  const data = await response.json();
+  if (!data.text || !data.text.trim()) {
+    throw new Error('没有提取到可用文字。如果这是扫描版 PDF，需要后续接 OCR 兜底。');
+  }
+
+  return data.text;
+};
+
+const htmlToReadableText = (html: string): string => {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const blocks: string[] = [];
+
+  doc.body.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6').forEach(element => {
+    if (element.closest('table')) return;
+    const text = compactLine(element.textContent || '');
+    if (text) blocks.push(text);
+  });
+
+  doc.body.querySelectorAll('tr').forEach(row => {
+    const cells = Array.from(row.querySelectorAll('th, td'))
+      .map(cell => compactLine(cell.textContent || ''))
+      .filter(Boolean);
+    if (cells.length === 0) return;
+
+    const merged = cells
+      .join(' ')
+      .replace(/\b([A-Ha-h])\s+([.、:：)])\s*/g, '$1$2 ')
+      .replace(/\b([A-Ha-h])\s+([\u4e00-\u9fa5A-Za-z0-9])/g, '$1. $2');
+    blocks.push(compactLine(merged));
+  });
+
+  if (blocks.length === 0) {
+    return compactLine(doc.body.textContent || '');
+  }
+
+  return blocks.join('\n');
+};
+
+const extractDocxText = async (arrayBuffer: ArrayBuffer): Promise<string> => {
+  const mammoth = await import('mammoth');
+  const htmlResult = await mammoth.default.convertToHtml({ arrayBuffer });
+  const text = htmlToReadableText(htmlResult.value);
+
+  if (text.trim()) return text;
+
+  const rawResult = await mammoth.default.extractRawText({ arrayBuffer });
+  return rawResult.value;
+};
+
+// --- 辅助：获取题库统计 ---
+const getChapterStats = (questions: Question[]) => {
+  const single = questions.filter(q => q.type === 'single').length;
+  const multiple = questions.filter(q => q.type === 'multiple').length;
+  const boolean = questions.filter(q => q.type === 'boolean').length;
+  return { single, multiple, boolean, total: questions.length };
+};
+
+const getSubjectStats = (subject: Subject) => {
+  let single = 0, multiple = 0, boolean = 0;
+  for (const ch of subject.chapters) {
+    const s = getChapterStats(ch.questions);
+    single += s.single;
+    multiple += s.multiple;
+    boolean += s.boolean;
+  }
+  return { single, multiple, boolean, total: single + multiple + boolean, chapters: subject.chapters.length };
+};
+
+const SUBJECT_ICON_MAP: Record<string, React.ReactNode> = {
+  'Monitor': <Monitor size={28} />,
+  'GitBranch': <GitBranch size={28} />,
+};
 
 export default function App() {
-  const [chapters, setChapters] = useState<Chapter[]>(() => {
+  // 用户自定义章节（存储在 localStorage）
+  const [userChapters, setUserChapters] = useState<Chapter[]>(() => {
     try {
-      const saved = localStorage.getItem('study-app-data');
+      const saved = localStorage.getItem('study-app-user-chapters');
       if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return DEFAULT_CHAPTERS;
-  });
-  
-  const [activeChapterId, setActiveChapterId] = useState<string>(() => {
-      return chapters.length > 0 ? chapters[0].id : '';
+    } catch { /* ignore */ }
+    return [];
   });
 
-  const [currentMode, setCurrentMode] = useState<'chapter_list' | 'study' | 'exam' | 'browse' | 'result' | 'import'>('chapter_list');
+  const [currentMode, setCurrentMode] = useState<ViewMode>('home');
+  const [activeSubjectId, setActiveSubjectId] = useState<string>('');
+  const [activeChapterId, setActiveChapterId] = useState<string>('');
   const [activeQuestions, setActiveQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<(number | number[] | null)[]>([]);
-  // 新增: confirmedQuestions 用于练习模式下追踪哪些题目已经“提交/确认”了
   const [confirmedQuestions, setConfirmedQuestions] = useState<Set<number>>(new Set());
-  
-  const [showQuestionGrid, setShowQuestionGrid] = useState(false); 
+  const [showQuestionGrid, setShowQuestionGrid] = useState(false);
   const [score, setScore] = useState(0);
-  
   const [importText, setImportText] = useState('');
   const [importTitle, setImportTitle] = useState('');
   const [importError, setImportError] = useState('');
+  const [importHint, setImportHint] = useState('');
+  const [isReadingDocument, setIsReadingDocument] = useState(false);
 
+  // 持久化用户自定义章节
   useEffect(() => {
-    localStorage.setItem('study-app-data', JSON.stringify(chapters));
-  }, [chapters]);
+    localStorage.setItem('study-app-user-chapters', JSON.stringify(userChapters));
+  }, [userChapters]);
 
-  const activeChapter = chapters.find(c => c.id === activeChapterId) || chapters[0];
+  // 查找当前激活的章节（优先从官方题库找，再从用户章节找）
+  const findChapter = (id: string): Chapter | undefined => {
+    for (const subj of SUBJECTS) {
+      const ch = subj.chapters.find(c => c.id === id);
+      if (ch) return ch;
+    }
+    return userChapters.find(c => c.id === id);
+  };
+
+  const activeChapter = findChapter(activeChapterId);
   const originalQuestions = activeChapter ? activeChapter.questions : [];
 
   useEffect(() => {
@@ -314,142 +580,71 @@ export default function App() {
   const deleteChapter = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (window.confirm('确定要删除这个章节吗？')) {
-      const newChapters = chapters.filter(c => c.id !== id);
-      setChapters(newChapters);
-      if (activeChapterId === id && newChapters.length > 0) {
-        setActiveChapterId(newChapters[0].id);
-      }
+      setUserChapters(prev => prev.filter(c => c.id !== id));
     }
   };
 
   const resetData = () => {
-    if (window.confirm('重置将丢失所有导入数据，恢复默认题库？')) {
-      setChapters(DEFAULT_CHAPTERS);
-      localStorage.setItem('study-app-data', JSON.stringify(DEFAULT_CHAPTERS));
+    if (window.confirm('重置将丢失所有自定义数据，确认？')) {
+      setUserChapters([]);
+      localStorage.removeItem('study-app-user-chapters');
       alert('已恢复。');
     }
   };
 
-  // --- 智能解析引擎 (修复 D 选项粘连) ---
+  const handleDocumentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setImportError('');
+    setImportHint('');
+    setIsReadingDocument(true);
+
+    try {
+      const extension = file.name.split('.').pop()?.toLowerCase();
+      const arrayBuffer = await file.arrayBuffer();
+      let extractedText = '';
+
+      if (extension === 'docx') {
+        extractedText = await extractDocxText(arrayBuffer);
+      } else if (extension === 'pdf') {
+        extractedText = await extractPdfText(arrayBuffer);
+      } else if (extension === 'doc') {
+        throw new Error('暂不支持旧版 .doc，请先另存为 .docx 后再导入。');
+      } else {
+        throw new Error('目前支持 .docx 和文字版 .pdf。');
+      }
+
+      const cleanText = extractedText.trim();
+      if (!cleanText) {
+        throw new Error('没有提取到可用文字。如果这是扫描版 PDF，需要后续接 OCR 兜底。');
+      }
+
+      const detectedCount = parseQuestionsFromText(cleanText).length;
+      setImportText(cleanText);
+      if (!importTitle.trim()) {
+        setImportTitle(file.name.replace(/\.[^.]+$/, ''));
+      }
+      setImportHint(
+        detectedCount > 0
+          ? `已从 ${file.name} 提取 ${cleanText.length} 个字符，初步识别 ${detectedCount} 道题。`
+          : `已从 ${file.name} 提取 ${cleanText.length} 个字符，但暂未识别到完整题目，可先检查下方文本格式。`
+      );
+    } catch (error) {
+      setImportError(`文档读取失败：${getErrorMessage(error)}`);
+    } finally {
+      setIsReadingDocument(false);
+    }
+  };
+
   const parseImportText = () => {
     setImportError('');
     if (!importTitle.trim()) { setImportError("请输入章节名称"); return; }
+    if (!importText.trim()) { setImportError("请先上传文档或粘贴题目文本"); return; }
 
     try {
-      const newQuestions: Question[] = [];
-      const lines = importText.split('\n');
-      
-      let currentQ: Partial<Question> | null = null;
-      let options: string[] = [];
-      // 新增状态：是否处于解析选项的阶段
-      let isParsingOptions = false; 
-      
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-
-        const questionMatch = line.match(/^(\d+)[\.、]\s*(.*)/);
-        
-        if (questionMatch) {
-          if (currentQ && options.length > 0) {
-            currentQ.options = [...options];
-            if (currentQ.correctAnswer === undefined) currentQ.correctAnswer = 0; 
-            newQuestions.push(currentQ as Question);
-          }
-
-          let qType: QuestionType = 'single';
-          const content = questionMatch[2];
-          if (content.includes('多选') || content.includes('多项')) qType = 'multiple';
-          else if (content.includes('判断') || content.includes('对错')) qType = 'boolean';
-
-          currentQ = {
-            id: newQuestions.length + 1,
-            type: qType,
-            question: content,
-            options: [],
-            explanation: ''
-          };
-          options = [];
-          isParsingOptions = true; // 开始新题，默认进入选项/题目解析阶段
-        } else if (currentQ) {
-            // 1. 关键检测：检查这行是否是“页脚信息”或“答案开始”
-            // 优化：增加 \s* 以兼容行首空格，增加对 : 开头的行的检测
-            const isFooterLine = 
-                /^\s*(?:我的)?答案[:：]/.test(line) || 
-                /^\s*正确答案[:：]/.test(line) ||
-                /^\s*[:：]/.test(line) || // 识别以冒号开头的解析行 (如 ":命令方式;")
-                /^\s*\d+\s*分\s*$/.test(line) || // 识别 "1分", " 1 分 "
-                /^\s*(?:知识点|AI讲解|解析)[:：]?/.test(line);
-
-            if (isFooterLine) {
-                isParsingOptions = false;
-            }
-
-            // 2. 尝试提取正确答案
-            const correctMatch = line.match(/正确答案[:：]?\s*([A-E]+|对|错)/i);
-            if (correctMatch) {
-                let ansStr = correctMatch[1].toUpperCase();
-                
-                if (currentQ.type === 'boolean') {
-                    currentQ.correctAnswer = (ansStr === '对' || ansStr === 'A') ? 0 : 1;
-                    if (options.length === 0) options = ["对", "错"];
-                } else if (currentQ.type === 'multiple') {
-                    const indices: number[] = [];
-                    for(let char of ansStr) {
-                        const code = char.charCodeAt(0) - 65;
-                        if (code >= 0 && code <= 10) indices.push(code);
-                    }
-                    currentQ.correctAnswer = indices.sort((a,b)=>a-b);
-                } else {
-                    currentQ.correctAnswer = ansStr.charCodeAt(0) - 65;
-                }
-
-                // 同行解析提取
-                const expl = line.replace(/.*(?:正确)?答案[:：]?\s*[A-E对错]+[;；]?/gi, '').replace(/AI讲解|解析|知识点[:：]?/g, '').trim();
-                if (expl) currentQ.explanation = expl;
-                continue;
-            }
-
-            // 3. 遇到“我的答案”，也标志着选项结束，但不提取内容
-            if (/^\s*(?:我的)?答案[:：]/.test(line)) {
-                isParsingOptions = false;
-                continue;
-            }
-
-            // 4. 识别选项 (A. xxx)
-            const optionMatches = [...line.matchAll(/(?:●\s*)?([A-E])[\.、]\s*(.*?)(?=\s+(?:●\s*)?[A-E][\.、]|$)/g)];
-            if (optionMatches.length > 0) {
-                isParsingOptions = true; // 确认是选项
-                optionMatches.forEach(m => options.push(m[2].trim()));
-            } else if (line.match(/^\s*(?:●\s*)?[A-E][\.、]/)) {
-                 isParsingOptions = true;
-                 options.push(line.replace(/^\s*(?:●\s*)?[A-E][\.、]\s*/, '').trim());
-            } else {
-                 // 5. 续行处理：只有当 isParsingOptions 为 true 且不是页脚行时，才追加到选项
-                 if (isParsingOptions && !isFooterLine) {
-                     if (options.length === 0) {
-                         currentQ.question += "\n" + line;
-                     } else {
-                         // 追加到最后一个选项
-                         options[options.length - 1] += " " + line;
-                     }
-                 } else {
-                     // 否则，追加到解析（过滤掉分值等无用信息）
-                     if (!/^\s*\d+\s*分\s*$/.test(line) && !/^\s*[:：]/.test(line)) {
-                        const cleanLine = line.replace(/^(?:AI讲解|解析|知识点)[:：]?\s*/, '');
-                        if (cleanLine.trim()) currentQ.explanation = (currentQ.explanation ? currentQ.explanation + "\n" : "") + cleanLine;
-                     }
-                 }
-            }
-        }
-      }
-
-      if (currentQ && options.length > 0) {
-        currentQ.options = [...options];
-        if (currentQ.correctAnswer === undefined) currentQ.correctAnswer = (currentQ.type === 'multiple' ? [] : 0);
-        newQuestions.push(currentQ as Question);
-      }
-
+      const newQuestions = parseQuestionsFromText(importText);
       if (newQuestions.length === 0) { setImportError("未识别到题目"); return; }
 
       const newChapter: Chapter = {
@@ -459,12 +654,13 @@ export default function App() {
         createDate: Date.now()
       };
 
-      setChapters([...chapters, newChapter]);
-      setCurrentMode('chapter_list');
+      setUserChapters(prev => [...prev, newChapter]);
+      setCurrentMode('home');
       setImportText('');
       setImportTitle('');
-    } catch (e) {
-      setImportError("解析错误: " + e);
+      setImportHint('');
+    } catch (error) {
+      setImportError(`解析错误：${getErrorMessage(error)}`);
     }
   };
 
@@ -472,56 +668,167 @@ export default function App() {
 
   // --- 界面渲染 ---
 
-  const renderChapterList = () => (
-    <div className="flex flex-col min-h-[500px] animate-in fade-in duration-500 pb-10">
-      <div className="text-center space-y-4 mb-8 pt-4">
-        <div className="bg-blue-100 p-4 rounded-full inline-block shadow-sm">
-          <BookOpen size={40} className="text-blue-600" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">我的习题库</h1>
-          <p className="text-gray-500 text-sm mt-1">支持单选、多选、判断题</p>
-        </div>
-      </div>
+  // 主页：学科分类
+  const renderHome = () => {
+    const totalQuestions = SUBJECTS.reduce((sum, s) => sum + getSubjectStats(s).total, 0);
+    const totalChapters = SUBJECTS.reduce((sum, s) => sum + s.chapters.length, 0);
 
-      <div className="grid grid-cols-1 gap-4 max-w-2xl mx-auto w-full">
-        {chapters.map(chapter => (
-          <div key={chapter.id} className="bg-white border border-gray-100 shadow-sm rounded-xl p-5 active:scale-[0.99] transition-transform">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-lg font-bold text-gray-800 line-clamp-1">{chapter.title}</h3>
-                <p className="text-sm text-gray-400 mt-1">{chapter.questions.length} 道题目</p>
-              </div>
-              {chapters.length > 1 && (
-                <button onClick={(e) => deleteChapter(e, chapter.id)} className="text-gray-300 hover:text-red-500 p-2">
-                  <Trash2 size={18} />
-                </button>
-              )}
-            </div>
-            <div className="flex space-x-2">
-              <button onClick={() => { setActiveChapterId(chapter.id); setCurrentMode('study'); }} className="flex-1 flex items-center justify-center py-2.5 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm">
-                <FileText size={16} className="mr-1.5" /> 练习
+    return (
+      <div className="flex flex-col min-h-[500px] animate-in fade-in duration-500 pb-10">
+        {/* 头部 */}
+        <div className="text-center space-y-3 mb-8 pt-4">
+          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-4 rounded-2xl inline-block shadow-lg shadow-blue-200">
+            <Layers size={36} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">学习题库</h1>
+            <p className="text-gray-400 text-sm mt-1">{totalChapters} 个题库 · {totalQuestions} 道题目</p>
+          </div>
+        </div>
+
+        {/* 学科分类卡片 */}
+        <div className="space-y-4 max-w-2xl mx-auto w-full">
+          <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider px-1">学科分类</h2>
+          {SUBJECTS.map(subject => {
+            const stats = getSubjectStats(subject);
+            return (
+              <button
+                key={subject.id}
+                onClick={() => { setActiveSubjectId(subject.id); setCurrentMode('subject'); }}
+                className="w-full bg-white border border-gray-100 shadow-sm rounded-2xl p-5 active:scale-[0.99] transition-all text-left hover:shadow-md group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`${subject.bgColor} p-3 rounded-xl ${subject.color} group-hover:scale-105 transition-transform`}>
+                    {SUBJECT_ICON_MAP[subject.icon]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-gray-800">{subject.name}</h3>
+                    <p className="text-sm text-gray-400 mt-0.5">{stats.chapters} 个题库 · {stats.total} 道题</p>
+                    <div className="flex gap-2 mt-2">
+                      {stats.single > 0 && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">单选 {stats.single}</span>}
+                      {stats.multiple > 0 && <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full font-medium">多选 {stats.multiple}</span>}
+                      {stats.boolean > 0 && <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">判断 {stats.boolean}</span>}
+                    </div>
+                  </div>
+                  <ChevronRight size={20} className="text-gray-300 group-hover:text-gray-500 transition-colors" />
+                </div>
               </button>
-              <button onClick={() => { setActiveChapterId(chapter.id); setCurrentMode('exam'); }} className="flex-1 flex items-center justify-center py-2.5 bg-purple-50 text-purple-700 rounded-lg font-medium text-sm">
-                <Award size={16} className="mr-1.5" /> 考试
-              </button>
-              <button onClick={() => { setActiveChapterId(chapter.id); setCurrentMode('browse'); }} className="flex-1 flex items-center justify-center py-2.5 bg-green-50 text-green-700 rounded-lg font-medium text-sm">
-                <Eye size={16} className="mr-1.5" /> 阅览
+            );
+          })}
+
+          {/* 用户自定义章节 */}
+          {userChapters.length > 0 && (
+            <>
+              <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider px-1 pt-4">自定义题库</h2>
+              {userChapters.map(chapter => (
+                <div key={chapter.id} className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 active:scale-[0.99] transition-transform">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-2">
+                      <BookMarked size={18} className="text-gray-400" />
+                      <h3 className="text-base font-bold text-gray-800 line-clamp-1">{chapter.title}</h3>
+                    </div>
+                    <button onClick={(e) => deleteChapter(e, chapter.id)} className="text-gray-300 hover:text-red-500 p-1">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <div className="flex gap-2 mb-3">
+                    {(() => {
+                      const s = getChapterStats(chapter.questions);
+                      return <>
+                        {s.single > 0 && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">单选 {s.single}</span>}
+                        {s.multiple > 0 && <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full font-medium">多选 {s.multiple}</span>}
+                        {s.boolean > 0 && <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">判断 {s.boolean}</span>}
+                      </>;
+                    })()}
+                    <span className="text-xs text-gray-400 ml-auto">{chapter.questions.length} 题</span>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button onClick={() => { setActiveChapterId(chapter.id); setCurrentMode('study'); }} className="flex-1 flex items-center justify-center py-2 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm">
+                      <FileText size={15} className="mr-1" /> 练习
+                    </button>
+                    <button onClick={() => { setActiveChapterId(chapter.id); setCurrentMode('exam'); }} className="flex-1 flex items-center justify-center py-2 bg-purple-50 text-purple-700 rounded-lg font-medium text-sm">
+                      <Award size={15} className="mr-1" /> 考试
+                    </button>
+                    <button onClick={() => { setActiveChapterId(chapter.id); setCurrentMode('browse'); }} className="flex-1 flex items-center justify-center py-2 bg-green-50 text-green-700 rounded-lg font-medium text-sm">
+                      <Eye size={15} className="mr-1" /> 阅览
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* 快速操作 */}
+          <div className="pt-4 space-y-3">
+            <button onClick={() => setCurrentMode('import')} className="w-full border-2 border-dashed border-gray-200 rounded-2xl p-4 text-gray-400 active:bg-gray-50 flex items-center justify-center font-medium hover:border-blue-300 hover:text-blue-500 transition-colors">
+              <Plus size={20} className="mr-2" /> 导入新题库
+            </button>
+            <div className="flex justify-center">
+              <button onClick={resetData} className="text-xs text-gray-400 flex items-center hover:text-gray-600">
+                <RefreshCw size={12} className="mr-1" /> 清除自定义数据
               </button>
             </div>
           </div>
-        ))}
-        <button onClick={() => setCurrentMode('import')} className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-gray-400 active:bg-gray-50 flex items-center justify-center font-medium">
-          <Plus size={20} className="mr-2" /> 导入新章节
-        </button>
-        <div className="pt-8 flex justify-center">
-            <button onClick={resetData} className="text-xs text-gray-400 flex items-center hover:text-gray-600">
-              <RefreshCw size={12} className="mr-1" /> 恢复默认题库
-            </button>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  // 学科详情页：章节列表
+  const renderSubject = () => {
+    const subject = SUBJECTS.find(s => s.id === activeSubjectId);
+    if (!subject) return null;
+
+    return (
+      <div className="max-w-2xl mx-auto animate-in slide-in-from-right-4">
+        <div className="flex items-center gap-3 mb-6 pt-2">
+          <button onClick={() => setCurrentMode('home')} className="p-2 -ml-2 rounded-full text-gray-600 hover:bg-gray-100">
+            <ArrowLeft size={22} />
+          </button>
+          <div className={`${subject.bgColor} p-2.5 rounded-xl ${subject.color}`}>
+            {SUBJECT_ICON_MAP[subject.icon]}
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">{subject.name}</h2>
+            <p className="text-sm text-gray-400">{subject.chapters.length} 个题库</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {subject.chapters.map(chapter => {
+            const stats = getChapterStats(chapter.questions);
+            return (
+              <div key={chapter.id} className="bg-white border border-gray-100 shadow-sm rounded-xl p-4 active:scale-[0.99] transition-transform">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <FolderOpen size={16} className="text-gray-400" />
+                    <h3 className="font-bold text-gray-800 line-clamp-1">{chapter.title}</h3>
+                  </div>
+                  <span className="text-xs text-gray-400 shrink-0">{stats.total} 题</span>
+                </div>
+                <div className="flex gap-1.5 mb-3">
+                  {stats.single > 0 && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">单选 {stats.single}</span>}
+                  {stats.multiple > 0 && <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full font-medium">多选 {stats.multiple}</span>}
+                  {stats.boolean > 0 && <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">判断 {stats.boolean}</span>}
+                </div>
+                <div className="flex space-x-2">
+                  <button onClick={() => { setActiveChapterId(chapter.id); setCurrentMode('study'); }} className="flex-1 flex items-center justify-center py-2 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm">
+                    <FileText size={15} className="mr-1" /> 练习
+                  </button>
+                  <button onClick={() => { setActiveChapterId(chapter.id); setCurrentMode('exam'); }} className="flex-1 flex items-center justify-center py-2 bg-purple-50 text-purple-700 rounded-lg font-medium text-sm">
+                    <Award size={15} className="mr-1" /> 考试
+                  </button>
+                  <button onClick={() => { setActiveChapterId(chapter.id); setCurrentMode('browse'); }} className="flex-1 flex items-center justify-center py-2 bg-green-50 text-green-700 rounded-lg font-medium text-sm">
+                    <Eye size={15} className="mr-1" /> 阅览
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   const renderQuiz = () => {
     if (activeQuestions.length === 0) return <div>No questions</div>;
@@ -541,7 +848,7 @@ export default function App() {
     return (
       <div className="max-w-3xl mx-auto flex flex-col h-full relative">
         <div className="flex items-center justify-between mb-4 pb-2 border-b">
-          <button onClick={() => setCurrentMode('chapter_list')} className="text-gray-500 active:text-gray-800 flex items-center text-sm p-2 -ml-2 rounded-lg">
+          <button onClick={() => setCurrentMode('home')} className="text-gray-500 active:text-gray-800 flex items-center text-sm p-2 -ml-2 rounded-lg">
             <RotateCcw size={18} />
           </button>
           <div className="flex items-center space-x-2">
@@ -712,11 +1019,11 @@ export default function App() {
              <span className="text-gray-400 text-2xl font-medium"> / {activeQuestions.length}</span>
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">{percentage >= 60 ? '考试合格 🎉' : '继续努力 💪'}</h2>
-          <p className="text-gray-500">得分率 {percentage}% · {activeChapter.title}</p>
+          <p className="text-gray-500">得分率 {percentage}% · {activeChapter?.title || ""}</p>
         </div>
         <div className="flex flex-col w-full max-w-xs space-y-3">
-          <button onClick={() => setCurrentMode('chapter_list')} className="w-full py-3.5 bg-white border border-gray-200 text-gray-700 rounded-xl active:bg-gray-50 font-medium">
-            返回列表
+          <button onClick={() => setCurrentMode('home')} className="w-full py-3.5 bg-white border border-gray-200 text-gray-700 rounded-xl active:bg-gray-50 font-medium">
+            返回主页
           </button>
         </div>
       </div>
@@ -727,8 +1034,8 @@ export default function App() {
   const renderBrowse = () => (
     <div className="max-w-3xl mx-auto min-h-[600px] animate-in slide-in-from-right-4 pb-20">
       <div className="flex items-center justify-between mb-4 pb-3 border-b sticky top-0 bg-white/95 backdrop-blur-sm z-10 pt-2">
-        <button onClick={() => setCurrentMode('chapter_list')} className="text-gray-600 flex items-center text-sm px-2 py-1"><ChevronLeft size={20} /> 返回</button>
-        <div className="text-base font-bold text-gray-800 truncate max-w-[150px]">{activeChapter.title}</div>
+        <button onClick={() => setCurrentMode('home')} className="text-gray-600 flex items-center text-sm px-2 py-1"><ChevronLeft size={20} /> 返回</button>
+        <div className="text-base font-bold text-gray-800 truncate max-w-[150px]">{activeChapter?.title || ""}</div>
       </div>
       <div className="space-y-6">
         {originalQuestions.map((q, idx) => (
@@ -759,7 +1066,7 @@ export default function App() {
   const renderImport = () => (
     <div className="max-w-2xl mx-auto h-full flex flex-col">
       <div className="flex items-center mb-6 pt-2">
-        <button onClick={() => setCurrentMode('chapter_list')} className="mr-3 p-2 -ml-2 rounded-full text-gray-600"><ChevronLeft size={24} /></button>
+        <button onClick={() => setCurrentMode('home')} className="mr-3 p-2 -ml-2 rounded-full text-gray-600"><ChevronLeft size={24} /></button>
         <h2 className="text-xl font-bold">导入新章节</h2>
       </div>
       <div className="flex-grow space-y-4">
@@ -768,19 +1075,57 @@ export default function App() {
           <input type="text" value={importTitle} onChange={(e) => setImportTitle(e.target.value)} placeholder="例如：期末模拟考" className="w-full p-4 bg-gray-50 border-2 rounded-xl" />
         </div>
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">题目文本 (自动识别单/多/判断)</label>
-          <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="粘贴PDF复制的文本..." className="w-full h-64 p-4 bg-gray-50 border-2 rounded-xl resize-none" />
+          <label className="block text-sm font-bold text-gray-700 mb-2">上传文档</label>
+          <label className={`flex items-center justify-between gap-4 rounded-xl border-2 border-dashed p-4 transition ${isReadingDocument ? 'bg-blue-50 border-blue-200 cursor-wait' : 'bg-gray-50 border-gray-200 cursor-pointer hover:border-blue-300 hover:bg-blue-50'}`}>
+            <div className="flex items-center min-w-0">
+              <div className="mr-3 rounded-lg bg-white p-2 text-blue-600 shadow-sm">
+                {isReadingDocument ? <Loader2 size={22} className="animate-spin" /> : <Upload size={22} />}
+              </div>
+              <div className="min-w-0">
+                <div className="font-bold text-gray-900">{isReadingDocument ? '正在读取文档' : '选择 Word 或学习通 PDF'}</div>
+                <div className="text-xs text-gray-500 truncate">学习通导出 PDF 会自动清理题号导航、作业详情和跨页噪声</div>
+              </div>
+            </div>
+            <span className="shrink-0 text-sm font-bold text-blue-600">上传</span>
+            <input
+              type="file"
+              accept=".docx,.pdf,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={handleDocumentUpload}
+              disabled={isReadingDocument}
+              className="hidden"
+            />
+          </label>
         </div>
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-2">题目文本 (自动识别单/多/判断)</label>
+          <textarea
+            value={importText}
+            onChange={(e) => {
+              setImportText(e.target.value);
+              setImportHint('');
+            }}
+            placeholder="上传文档后会自动填入，也可以直接粘贴题目文本..."
+            className="w-full h-64 p-4 bg-gray-50 border-2 rounded-xl resize-none"
+          />
+        </div>
+        {importHint && <div className="text-blue-700 text-sm bg-blue-50 p-3 rounded-xl"><FileText size={16} className="inline mr-2" />{importHint}</div>}
         {importError && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-xl"><AlertCircle size={16} className="inline mr-2" />{importError}</div>}
       </div>
-      <button onClick={parseImportText} className="w-full py-4 mt-6 bg-blue-600 text-white rounded-xl font-bold">识别并保存</button>
+      <button
+        onClick={parseImportText}
+        disabled={isReadingDocument}
+        className={`w-full py-4 mt-6 rounded-xl font-bold text-white ${isReadingDocument ? 'bg-gray-300' : 'bg-blue-600 hover:bg-blue-700'}`}
+      >
+        识别并保存
+      </button>
     </div>
   );
 
   return (
     <div className="min-h-screen bg-white md:bg-gray-50 py-0 md:py-8 font-sans text-gray-900">
       <div className="max-w-4xl mx-auto bg-white md:rounded-2xl md:shadow-xl min-h-screen md:min-h-[600px] p-5 md:p-8 transition-all">
-        {currentMode === 'chapter_list' && renderChapterList()}
+        {currentMode === 'home' && renderHome()}
+        {currentMode === 'subject' && renderSubject()}
         {(currentMode === 'study' || currentMode === 'exam') && renderQuiz()}
         {currentMode === 'browse' && renderBrowse()}
         {currentMode === 'result' && renderResult()}
