@@ -2,7 +2,7 @@
   "miniprogramRoot": "dist/",
   "projectname": "study-app-mini",
   "description": "习题练习小程序",
-  "appid": "wxf465aa48de1a057d",
+  "appid": "your-appid-here",
   "setting": {
     "urlCheck": false,
     "es6": true,
